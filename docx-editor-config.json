@@ -1,0 +1,48 @@
+{
+  "version": 2,
+  "headingConfig": {
+    "1": {
+      "family": "黑体",
+      "size": "20pt",
+      "bold": true,
+      "color": "#4130c5"
+    },
+    "2": {
+      "family": "宋体",
+      "size": "16pt",
+      "bold": true,
+      "color": "#32b849"
+    },
+    "3": {
+      "family": "宋体",
+      "size": "14pt",
+      "bold": true,
+      "color": "#d05716"
+    },
+    "4": {
+      "family": "宋体",
+      "size": "12pt",
+      "bold": true,
+      "color": "#000000"
+    },
+    "5": {
+      "family": "宋体",
+      "size": "12pt",
+      "bold": false,
+      "color": "#000000"
+    },
+    "6": {
+      "family": "宋体",
+      "size": "12pt",
+      "bold": false,
+      "color": "#000000"
+    }
+  },
+  "bodyFont": "宋体",
+  "bodySize": "10.5pt",
+  "bodyLineHeight": "1.5",
+  "imgCenter": true,
+  "theme": "light",
+  "numberingEnabled": true,
+  "numberingStyle": "一二三"
+}

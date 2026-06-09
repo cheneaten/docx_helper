@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOCX 文档编辑器</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- 顶部工具栏 -->
+    <header class="toolbar">
+        <div class="toolbar-left">
+            <h1>📄 DOCX 文档编辑器</h1>
+        </div>
+        <div class="toolbar-center">
+            <button id="importBtn" class="btn btn-primary" title="导入 DOCX 文件 (Ctrl+O)">
+                <span class="icon">📂</span> 导入 DOCX
+            </button>
+            <button id="exportBtn" class="btn btn-success" title="导出为 DOCX 文件 (Ctrl+S)">
+                <span class="icon">💾</span> 导出 DOCX
+            </button>
+            <button id="insertTableBtn" class="btn btn-secondary" title="插入表格">
+                <span class="icon">📊</span> 表格
+            </button>
+            <button id="insertCodeBtn" class="btn btn-secondary" title="插入代码块">
+                <span class="icon">💻</span> 代码
+            </button>
+            <button id="drawBtn" class="btn btn-secondary" title="绘图工具">
+                <span class="icon">🎨</span> 绘图
+            </button>
+            <button id="formatPainterBtn" class="btn btn-secondary" title="格式刷 — 复制格式" style="position:relative;">
+                <span class="icon">🖌️</span> 格式刷
+            </button>
+            <button id="printBtn" class="btn btn-secondary" title="打印文档">
+                <span class="icon">🖨️</span> 打印
+            </button>
+            <button id="anchorPanelBtn" class="btn btn-secondary" title="锚点管理 — 在光标处添加/移除锚点 (F9)">
+                <span class="icon">📌</span> 锚点
+            </button>
+            <button id="foldPanelBtn" class="btn btn-secondary" title="折叠管理 — 查看所有折叠区域">
+                <span class="icon">📁</span> 折叠
+            </button>
+        </div>
+        <div class="toolbar-right">
+            <button id="emojiPopupBtn" class="btn btn-icon" title="表情符号 (Ctrl+E)">😊</button>
+            <button id="fullscreenToggle" class="btn btn-icon" title="全屏模式 (F11)" aria-label="全屏切换">
+                <span class="fullscreen-icon">⛶</span>
+            </button>
+            <button id="helpBtn" class="btn btn-icon" title="帮助 (F1)" aria-label="帮助">
+                <span>❓</span>
+            </button>
+            <button id="themeToggle" class="btn btn-icon" title="切换亮暗主题" aria-label="切换主题">
+                <span class="theme-icon">🌙</span>
+            </button>
+            <label class="file-info">
+                <input type="file" id="fileInput" accept=".docx" hidden>
+            </label>
+        </div>
+    </header>
+
+    <!-- 📑 多文档标签栏 -->
+    <div id="tabBar" class="tab-bar">
+        <div class="tab-list" id="tabList">
+            <!-- 动态生成标签按钮 -->
+        </div>
+        <button id="addTabBtn" class="tab-add-btn" title="新建文档（最多3个）">+</button>
+        <div id="tabStats" class="tab-stats">
+            <span class="stat-item stat-freq-words" title="前5高频词"><span>🔤</span> <span id="statFreqWords" class="stat-value freq-words-value">-</span></span>
+            <span class="stat-separator">│</span>
+            <span class="stat-item" title="字数"><span>📝</span> <span id="statWordCount" class="stat-value">0</span></span>
+            <span class="stat-separator">│</span>
+            <span class="stat-item" title="行数"><span>📄</span> <span id="statLineCount" class="stat-value">0</span></span>
+            <span class="stat-separator">│</span>
+            <span class="stat-item" title="图片"><span>🖼️</span> <span id="statImageCount" class="stat-value">0</span></span>
+            <span class="stat-separator">│</span>
+            <span class="stat-item" title="代码"><span>💻</span> <span id="statCodeCount" class="stat-value">0</span></span>
+            <span class="stat-separator">│</span>
+            <span class="stat-item" title="表格"><span>📊</span> <span id="statTableCount" class="stat-value">0</span></span>
+            <span class="stat-separator">│</span>
+            <span class="stat-item" title="大小"><span>💾</span> <span id="statFileSize" class="stat-value">0 KB</span></span>
+        </div>
+    </div>
+    <!-- 标签 tooltip -->
+    <div id="tabTooltip" class="tab-tooltip"></div>
+
+    <!-- 表格插入选择器 -->
+    <div id="tablePickerOverlay" class="table-picker-overlay hidden">
+        <div class="table-picker">
+            <div class="table-picker-header">插入表格</div>
+            <div class="table-picker-grid-container">
+                <div id="tablePickerGrid" class="table-picker-grid"></div>
+            </div>
+            <div id="tablePickerInfo" class="table-picker-info">1 × 1</div>
+            <div class="table-picker-options">
+                <label class="table-picker-label">
+                    <span>单元格间距：</span>
+                    <select id="tableCellPadding">
+                        <option value="0">无</option>
+                        <option value="4">小 (4px)</option>
+                        <option value="8" selected>中 (8px)</option>
+                        <option value="12">大 (12px)</option>
+                    </select>
+                </label>
+            </div>
+            <div class="table-picker-actions">
+                <button id="tablePickerInsert" class="btn btn-sm btn-primary">插入</button>
+                <button id="tablePickerCancel" class="btn btn-sm btn-secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JSON 助手弹窗 -->
+    <div id="jsonModalOverlay" class="json-modal-overlay hidden">
+        <div class="json-modal">
+            <div class="json-modal-header">
+                <span>🧩 JSON 助手 — AI 标题格式化</span>
+                <button id="jsonModalClose" class="btn btn-icon" title="关闭" style="width:28px;height:28px;font-size:16px;line-height:1;">✕</button>
+            </div>
+            <div class="json-modal-body">
+                <div id="hintScrollContainer" class="hint-scroll-container">
+                    <div class="hint-input-wrap">
+                        <div id="hintLineNumbers" class="hint-line-numbers"></div>
+                        <textarea id="hintInput" class="hint-textarea" placeholder='[{"level":1,"text":"一、引言","anchor":"由于系统底层"},{"level":2,"text":"（一）背景","anchor":"首先准备环境"}]' spellcheck="false"></textarea>
+                    </div>
+                </div>
+                <div id="jsonStatus" class="json-status hidden"></div>
+            </div>
+            <div class="json-modal-footer">
+                <button id="validateJsonBtn" class="btn btn-sm btn-secondary" title="检测 JSON 格式并定位错误">🔍 检测</button>
+                <button id="formatJsonBtn" class="btn btn-sm btn-secondary" title="格式化 JSON">📐 格式化</button>
+                <button id="applyHintBtn" class="btn btn-sm btn-accent" style="min-width:80px;">应用标题</button>
+                <button id="clearHintBtn" class="btn btn-sm btn-secondary">清空</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📌 锚点管理浮动面板 -->
+    <div id="anchorPanel" class="anchor-panel hidden">
+        <div id="anchorPanelHeader" class="search-panel-header">
+            <span>📌 锚点列表</span>
+            <button id="anchorPanelClose" class="btn btn-icon" title="关闭" style="width:24px;height:24px;font-size:14px;line-height:1;">✕</button>
+        </div>
+        <div class="search-panel-body">
+            <div id="anchorList" class="anchor-list"></div>
+        </div>
+        <div class="anchor-panel-footer">
+            <button id="anchorPrev" class="btn btn-sm btn-secondary" title="上一个锚点 (Ctrl+Shift+↑)">◀ 上一个</button>
+            <button id="anchorNext" class="btn btn-sm btn-secondary" title="下一个锚点 (Ctrl+Shift+↓)">下一个 ▶</button>
+            <button id="anchorClearAll" class="btn btn-sm btn-danger" title="清除所有锚点">清除全部</button>
+        </div>
+    </div>
+
+    <!-- 😊 表情符号选择器 -->
+    <div id="emojiPopup" class="emoji-popup hidden">
+        <div class="emoji-popup-header">
+            <span>😊 表情符号</span>
+            <button id="emojiPopupClose" class="btn btn-icon" title="关闭" style="width:24px;height:24px;font-size:14px;line-height:1;">✕</button>
+        </div>
+        <div class="emoji-popup-tabs" id="emojiTabs"></div>
+        <div class="emoji-popup-grid" id="emojiGrid"></div>
+    </div>
+
+    <!-- 📁 折叠管理浮动面板 -->
+    <div id="foldPanel" class="anchor-panel hidden">
+        <div id="foldPanelHeader" class="search-panel-header">
+            <span>📁 折叠列表</span>
+            <button id="foldPanelClose" class="btn btn-icon" title="关闭" style="width:24px;height:24px;font-size:14px;line-height:1;">✕</button>
+        </div>
+        <div class="search-panel-body">
+            <div id="foldList" class="anchor-list"></div>
+        </div>
+        <div class="anchor-panel-footer">
+            <button id="foldExpandAll" class="btn btn-sm btn-secondary" title="展开全部折叠">📂 全部展开</button>
+            <button id="foldCollapseAll" class="btn btn-sm btn-secondary" title="折叠全部区域">📁 全部折叠</button>
+            <button id="foldClearAll" class="btn btn-sm btn-danger" title="清除所有折叠标记">清除全部</button>
+        </div>
+    </div>
+
+    <!-- 查找与替换浮动面板（可拖动、不遮挡编辑器） -->
+    <div id="searchFloatingPanel" class="search-floating-panel hidden">
+        <div id="searchPanelHeader" class="search-panel-header">
+            <span>🔍 查找与替换</span>
+            <button id="searchPanelClose" class="btn btn-icon" title="关闭" style="width:24px;height:24px;font-size:14px;line-height:1;">✕</button>
+        </div>
+        <div class="search-panel-body">
+            <div class="search-panel-row">
+                <input type="text" id="searchInput" placeholder="查找内容..." class="search-input">
+            </div>
+            <div class="search-panel-row">
+                <input type="text" id="replaceInput" placeholder="替换为..." class="search-input">
+            </div>
+            <div class="search-panel-options">
+                <span id="searchMatchInfo" class="search-match-info">0 个匹配</span>
+            </div>
+            <div class="search-panel-actions">
+                <button id="searchBtn" class="btn btn-sm btn-primary">查找</button>
+                <button id="prevMatch" class="btn btn-sm btn-secondary" disabled>▲</button>
+                <button id="nextMatch" class="btn btn-sm btn-secondary" disabled>▼</button>
+                <span style="flex:1;"></span>
+                <button id="replaceBtn" class="btn btn-sm btn-warning" disabled>替换</button>
+                <button id="replaceAllBtn" class="btn btn-sm btn-accent">全部替换</button>
+            </div>
+            <div id="searchResultList" class="search-result-list">
+                <div class="search-result-empty">输入关键词后点击"查找"</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 对象浏览浮动面板（代码块/表格列表，可拖动） -->
+    <div id="objectBrowserPanel" class="search-floating-panel hidden" style="width:min(480px,70vw);">
+        <div id="objectBrowserHeader" class="search-panel-header">
+            <span>🔎 浏览代码块与表格</span>
+            <button id="objectBrowserClose" class="btn btn-icon" title="关闭" style="width:24px;height:24px;font-size:14px;line-height:1;">✕</button>
+        </div>
+        <div class="search-panel-body" style="gap:4px;">
+            <div class="search-panel-options">
+                <div style="display:flex;gap:4px;">
+                    <button id="objBrowseCode" class="btn btn-sm btn-primary">💻 代码块</button>
+                    <button id="objBrowseTable" class="btn btn-sm btn-secondary">📊 表格</button>
+                </div>
+                <span id="objBrowseInfo" class="search-match-info">0 个</span>
+            </div>
+            <div id="objBrowseList" class="search-result-list" style="max-height:350px;">
+                <div class="search-result-empty">选择一个类型浏览</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🐾 写作陪伴宠物（三只可选） -->
+    <div id="petPanel" class="pet-panel" title="拖拽移动">
+        <!-- 顶部小按钮栏 -->
+        <div class="pet-top-btns">
+            <button id="petInfoBtn" class="pet-info-btn" title="编辑宠物档案" onclick="window.__petOpenProfile()">📋</button>
+            <button id="petSwitchBtn" class="pet-switch-btn" title="切换宠物" onclick="window.__petSwitchNext()">🔄</button>
+        </div>
+        <!-- 🐱 小猫：小橘 -->
+        <div id="petCharCat" class="pet-character active" data-pet="cat">
+            <div class="pet-head">
+                <div class="pet-ear pet-ear-l"></div>
+                <div class="pet-ear pet-ear-r"></div>
+                <div class="pet-face">
+                    <div class="pet-eye pet-eye-l"><div class="pet-pupil"></div></div>
+                    <div class="pet-eye pet-eye-r"><div class="pet-pupil"></div></div>
+                    <div class="pet-nose"></div>
+                    <div class="pet-mouth">
+                        <span class="pet-mouth-l"></span><span class="pet-mouth-r"></span>
+                    </div>
+                    <div class="pet-whisker pet-whisker-l1"></div>
+                    <div class="pet-whisker pet-whisker-l2"></div>
+                    <div class="pet-whisker pet-whisker-r1"></div>
+                    <div class="pet-whisker pet-whisker-r2"></div>
+                    <div class="pet-blush pet-blush-l"></div>
+                    <div class="pet-blush pet-blush-r"></div>
+                </div>
+            </div>
+            <div class="pet-body">
+                <div class="pet-paw pet-paw-l"></div>
+                <div class="pet-paw pet-paw-r"></div>
+            </div>
+            <div class="pet-tail"></div>
+        </div>
+        <!-- 🐶 小狗：旺财 -->
+        <div id="petCharDog" class="pet-character" data-pet="dog">
+            <div class="pet-head">
+                <div class="pet-ear pet-ear-l"></div>
+                <div class="pet-ear pet-ear-r"></div>
+                <div class="pet-face">
+                    <div class="pet-eye pet-eye-l"><div class="pet-pupil"></div></div>
+                    <div class="pet-eye pet-eye-r"><div class="pet-pupil"></div></div>
+                    <div class="pet-nose"></div>
+                    <div class="pet-mouth">
+                        <span class="pet-mouth-l"></span><span class="pet-mouth-r"></span>
+                    </div>
+                    <div class="pet-tongue"></div>
+                    <div class="pet-blush pet-blush-l"></div>
+                    <div class="pet-blush pet-blush-r"></div>
+                </div>
+            </div>
+            <div class="pet-body">
+                <div class="pet-paw pet-paw-l"></div>
+                <div class="pet-paw pet-paw-r"></div>
+            </div>
+            <div class="pet-tail"></div>
+        </div>
+        <!-- 🐰 小兔：雪球 -->
+        <div id="petCharBunny" class="pet-character" data-pet="bunny">
+            <div class="pet-head">
+                <div class="pet-ear pet-ear-l"></div>
+                <div class="pet-ear pet-ear-r"></div>
+                <div class="pet-face">
+                    <div class="pet-eye pet-eye-l"><div class="pet-pupil"></div></div>
+                    <div class="pet-eye pet-eye-r"><div class="pet-pupil"></div></div>
+                    <div class="pet-nose"></div>
+                    <div class="pet-mouth">
+                        <span class="pet-mouth-l"></span><span class="pet-mouth-r"></span>
+                    </div>
+                    <div class="pet-blush pet-blush-l"></div>
+                    <div class="pet-blush pet-blush-r"></div>
+                </div>
+            </div>
+            <div class="pet-body">
+                <div class="pet-paw pet-paw-l"></div>
+                <div class="pet-paw pet-paw-r"></div>
+            </div>
+            <div class="pet-tail"></div>
+        </div>
+        <div id="petBubble" class="pet-bubble hidden">
+            <span id="petBubbleText"></span>
+        </div>
+        <div id="petEmoji" class="pet-emoji-burst"></div>
+    </div>
+
+    <!-- 左侧面板隐藏时的展开按钮 -->
+    <div id="leftPanelToggle" class="panel-toggle panel-toggle-left hidden" title="展开左侧面板">☰</div>
+    <div id="rightPanelToggle" class="panel-toggle panel-toggle-right hidden" title="展开右侧面板">📑</div>
+
+    <!-- 🎨 绘图工具浮动面板 -->
+    <div id="drawPanel" class="draw-panel hidden">
+        <div id="drawPanelHeader" class="draw-panel-header">
+            <span>🎨 绘图工具</span>
+            <div class="draw-panel-header-right">
+                <span id="drawStatus" class="draw-status">就绪</span>
+                <button id="drawPanelClose" class="btn btn-icon" title="关闭" style="width:24px;height:24px;font-size:14px;line-height:1;">✕</button>
+            </div>
+        </div>
+        <div class="draw-panel-toolbar" id="drawToolbar">
+            <span class="draw-toolbar-label">工具</span>
+            <button class="draw-tool-btn" data-tool="select" title="选择/移动 (S)">🖱️</button>
+            <button class="draw-tool-btn active" data-tool="pencil" title="画笔 (P)">✏️</button>
+            <button class="draw-tool-btn" data-tool="line" title="直线 (L)">📏</button>
+            <button class="draw-tool-btn" data-tool="arrow" title="箭头 (A)">➡️</button>
+            <button class="draw-tool-btn" data-tool="eraser" title="橡皮 (E)">🧹</button>
+            <span class="draw-toolbar-divider"></span>
+            <span class="draw-toolbar-label">流程图</span>
+            <button class="draw-tool-btn" data-tool="roundrect" title="开始/结束">🔲</button>
+            <button class="draw-tool-btn" data-tool="process" title="处理">▭</button>
+            <button class="draw-tool-btn" data-tool="diamond" title="判断">◈</button>
+            <button class="draw-tool-btn" data-tool="parallelogram" title="输入/输出">▱</button>
+            <button class="draw-tool-btn" data-tool="document" title="文档">📄</button>
+            <button class="draw-tool-btn" data-tool="hexagon" title="预定义">⬡</button>
+            <span class="draw-toolbar-divider"></span>
+            <span class="draw-toolbar-label">形状</span>
+            <button class="draw-tool-btn" data-tool="textbox" title="文本框">📝</button>
+            <button class="draw-tool-btn" data-tool="triangle" title="三角形">△</button>
+            <button class="draw-tool-btn" data-tool="star" title="星形">★</button>
+            <button class="draw-tool-btn" data-tool="pentagon" title="五边形">⬠</button>
+            <button class="draw-tool-btn" data-tool="heart" title="心形">♥</button>
+            <button class="draw-tool-btn" data-tool="cloud" title="云形">☁️</button>
+            <button class="draw-tool-btn" data-tool="cylinder" title="圆柱">🗄️</button>
+            <span class="draw-toolbar-divider"></span>
+            <span class="draw-toolbar-label">思维导图</span>
+            <button class="draw-tool-btn" data-tool="topic" title="中心主题">⭕</button>
+            <button class="draw-tool-btn" data-tool="subtopic" title="子主题">◯</button>
+            <button class="draw-tool-btn" data-tool="connector" title="连接线">🔗</button>
+            <span class="draw-toolbar-divider"></span>
+            <span class="draw-toolbar-label">操作</span>
+            <button class="draw-tool-btn" id="drawUndoBtn" title="撤销 (Ctrl+Z)">↩️</button>
+            <button class="draw-tool-btn" id="drawDeleteBtn" title="删除选中 (Delete)" style="color:#dc2626;">✕</button>
+            <button class="draw-tool-btn" id="drawClearBtn" title="清空画布">🗑️</button>
+            <span class="draw-toolbar-divider"></span>
+            <input type="color" id="drawColorPicker" class="draw-color-picker" value="#2563eb" title="形状颜色">
+            <input type="color" id="drawFillColorPicker" class="draw-color-picker" value="#dbeafe" title="填充颜色">
+            <select id="drawLineWidth" class="draw-line-width" title="线条粗细">
+                <option value="1">1px</option>
+                <option value="2" selected>2px</option>
+                <option value="3">3px</option>
+                <option value="4">4px</option>
+            </select>
+            <label class="draw-fill-label" title="启用填充">
+                <input type="checkbox" id="drawFillToggle" checked>
+                <span>填充</span>
+            </label>
+            <span class="draw-toolbar-divider"></span>
+            <button id="drawCopyBtn" class="btn btn-sm btn-primary" title="复制为图片到剪贴板">📋 复制</button>
+        </div>
+        <div class="draw-canvas-wrap">
+            <canvas id="drawCanvas" class="draw-canvas" width="800" height="500"></canvas>
+            <div id="drawCanvasHint" class="draw-canvas-hint">单击添加形状 / 拖拽移动 / 双击编辑文字</div>
+        </div>
+        <!-- 形状文字编辑输入 -->
+        <div id="drawTextInput" class="draw-text-input hidden" contenteditable="true"></div>
+    </div>
+
+    <!-- 插入代码弹窗 -->
+    <div id="codeModalOverlay" class="json-modal-overlay hidden">
+        <div class="json-modal" style="width:min(580px,90vw);">
+            <div class="json-modal-header">
+                <span>💻 插入代码块</span>
+                <button id="codeModalClose" class="btn btn-icon" title="关闭" style="width:28px;height:28px;font-size:16px;line-height:1;">✕</button>
+            </div>
+            <div class="json-modal-body">
+                <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;">粘贴或输入代码：</div>
+                <textarea id="codeInput" class="hint-textarea" placeholder="粘贴代码到这里..." style="height:260px;font-size:12px;" spellcheck="false"></textarea>
+                <div class="format-row" style="margin-top:8px;">
+                    <span class="format-label" style="min-width:50px;">语言</span>
+                    <select id="codeLangSelect" style="flex:1;font-size:11px;padding:2px 4px;">
+                        <option value="Code">Code</option>
+                        <option value="JavaScript">JavaScript</option>
+                        <option value="TypeScript">TypeScript</option>
+                        <option value="Python">Python</option>
+                        <option value="Java">Java</option>
+                        <option value="C++">C++</option>
+                        <option value="C#">C#</option>
+                        <option value="Go">Go</option>
+                        <option value="Rust">Rust</option>
+                        <option value="HTML">HTML</option>
+                        <option value="CSS">CSS</option>
+                        <option value="SQL">SQL</option>
+                        <option value="Shell">Shell</option>
+                        <option value="JSON">JSON</option>
+                    </select>
+                </div>
+            </div>
+            <div class="json-modal-footer">
+                <button id="codeModalCancel" class="btn btn-sm btn-secondary">取消</button>
+                <button id="codeModalInsert" class="btn btn-sm btn-primary">插入代码</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🖼️ 图片编辑器覆盖层 -->
+    <div id="imageEditorOverlay" class="image-editor-overlay hidden" tabindex="-1">
+        <div class="image-editor-container">
+            <div class="image-editor-header">
+                <span id="imageEditorTitle">🖼️ 图片编辑</span>
+                <button id="imageEditorClose" class="btn btn-icon" title="关闭" style="width:28px;height:28px;font-size:16px;line-height:1;">✕</button>
+            </div>
+            <div class="image-editor-toolbar" id="imageEditorToolbar">
+                <!-- 视图工具 -->
+                <span class="img-editor-tool-group">
+                    <button class="img-editor-tool-btn" data-tool="zoomin" title="放大">🔍⁺</button>
+                    <button class="img-editor-tool-btn" data-tool="zoomout" title="缩小">🔍⁻</button>
+                    <button class="img-editor-tool-btn" data-tool="fit" title="适合屏幕">↕️</button>
+                    <span id="imageZoomLabel" class="img-editor-zoom-label">100%</span>
+                </span>
+                <span class="img-editor-tool-divider"></span>
+                <!-- 绘制工具 -->
+                <span class="img-editor-tool-group">
+                    <button class="img-editor-tool-btn active" data-tool="select" title="选择/移动 (S)">🖱️</button>
+                    <button class="img-editor-tool-btn" data-tool="pen" title="画笔 (P)">✏️</button>
+                    <button class="img-editor-tool-btn" data-tool="eraser" title="橡皮 (E)">🧹</button>
+                    <button class="img-editor-tool-btn" data-tool="text" title="文本框 (T)">📝</button>
+                    <button class="img-editor-tool-btn" data-tool="rect" title="矩形 (R)">⬜</button>
+                    <button class="img-editor-tool-btn" data-tool="line" title="直线 (L)">📏</button>
+                    <button class="img-editor-tool-btn" data-tool="arrow" title="箭头 (A)">➡️</button>
+                </span>
+                <span class="img-editor-tool-divider"></span>
+                <!-- 裁剪与操作 -->
+                <span class="img-editor-tool-group">
+                    <button class="img-editor-tool-btn" data-tool="crop" title="裁剪 (C)">✂️</button>
+                </span>
+                <span class="img-editor-tool-divider"></span>
+                <!-- 颜色与线宽 -->
+                <span class="img-editor-tool-group">
+                    <input type="color" id="imgEditorColor" class="img-editor-color" value="#ff0000" title="线条颜色">
+                    <select id="imgEditorLineWidth" class="img-editor-line-width" title="线条粗细">
+                        <option value="1">1px</option>
+                        <option value="2" selected>2px</option>
+                        <option value="3">3px</option>
+                        <option value="4">4px</option>
+                        <option value="6">6px</option>
+                        <option value="8">8px</option>
+                    </select>
+                    <input type="color" id="imgEditorFillColor" class="img-editor-color" value="#ff000020" title="填充颜色">
+                </span>
+                <span class="img-editor-tool-divider"></span>
+                <!-- 撤销/重做 -->
+                <span class="img-editor-tool-group">
+                    <button class="img-editor-tool-btn" id="imgEditorUndo" data-tool="undo" title="撤销 (Ctrl+Z)">↩️</button>
+                    <button class="img-editor-tool-btn" id="imgEditorRedo" data-tool="redo" title="重做 (Ctrl+Y)">↪️</button>
+                </span>
+            </div>
+            <div class="image-editor-canvas-wrap" id="imageEditorCanvasWrap">
+                <canvas id="imageEditorCanvas" class="image-editor-canvas"></canvas>
+                <div id="imageEditorHint" class="image-editor-hint">✏️ 使用工具栏工具在图片上绘制标注 | 滚轮缩放 | 拖拽平移</div>
+            </div>
+            <!-- 裁剪确认栏 -->
+            <div id="imageCropBar" class="image-crop-bar hidden">
+                <span>✂️ 拖拽选择裁剪区域</span>
+                <button id="imageCropConfirm" class="btn btn-sm btn-primary">确认裁剪</button>
+                <button id="imageCropCancel" class="btn btn-sm btn-secondary">取消</button>
+            </div>
+            <div class="image-editor-footer">
+                <span id="imageEditorStatus" class="image-editor-status">就绪</span>
+                <div class="image-editor-footer-actions">
+                    <button id="imageEditorApply" class="btn btn-sm btn-primary">✅ 应用修改</button>
+                    <button id="imageEditorDiscard" class="btn btn-sm btn-secondary">❌ 放弃修改</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📊 底部状态栏 -->
+    <div id="statsBar" class="stats-bar">
+        <span id="docStatus" class="status">就绪</span>
+        <span id="sessionTimer" class="session-timer" title="当前会话时间">⏱ 00:00</span>
+        <span id="saveIndicator" class="save-indicator hidden" title="自动保存状态"></span>
+    </div>
+
+    <!-- 主布局 -->
+    <div class="main-layout">
+
+        <!-- 左侧面板 -->
+        <aside class="left-panel" id="leftPanel">
+            <div class="panel-section">
+                <h3 class="panel-title">📷 图片设置</h3>
+                <div class="panel-body">
+                    <label class="switch-label">
+                        <input type="checkbox" id="imgCenterToggle">
+                        <span class="switch-slider"></span>
+                        <span>全文图片居中</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3 class="panel-title">🐾 陪伴宠物</h3>
+                <div class="panel-body">
+                    <!-- 宠物选择器 -->
+                    <div class="pet-selector" style="display:flex;gap:4px;margin-bottom:8px;">
+                        <button class="pet-select-btn active" data-pet="cat" title="小橘 — 橘猫" onclick="window.__petSwitchTo('cat')">
+                            <span class="pet-select-emoji">🐱</span>
+                            <span class="pet-select-name">小橘</span>
+                        </button>
+                        <button class="pet-select-btn" data-pet="dog" title="旺财 — 柴犬" onclick="window.__petSwitchTo('dog')">
+                            <span class="pet-select-emoji">🐶</span>
+                            <span class="pet-select-name">旺财</span>
+                        </button>
+                        <button class="pet-select-btn" data-pet="bunny" title="雪球 — 小兔" onclick="window.__petSwitchTo('bunny')">
+                            <span class="pet-select-emoji">🐰</span>
+                            <span class="pet-select-name">雪球</span>
+                        </button>
+                    </div>
+                    <!-- 宠物信息摘要 -->
+                    <div id="petInfoSummary" class="pet-info-summary" style="font-size:11px;color:var(--text-secondary);margin-bottom:6px;line-height:1.6;">
+                        小橘 · ♂ · 2岁 · 4.5kg
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <button id="petToggleBtn" class="btn btn-sm btn-secondary" style="justify-content:center;flex:1;" onclick="window.__petToggle()">🙈 隐藏</button>
+                        <button id="petPetBtn" class="btn btn-sm btn-primary" style="justify-content:center;flex-shrink:0;" onclick="window.__petPet()">摸摸头 ❤️</button>
+                        <button id="petProfileBtn" class="btn btn-sm btn-secondary" style="justify-content:center;flex-shrink:0;" title="编辑宠物档案" onclick="window.__petOpenProfile()">✏️</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3 class="panel-title">💻 代码设置</h3>
+                <div class="panel-body">
+                    <label class="switch-label">
+                        <input type="checkbox" id="codeDetectToggle" checked>
+                        <span class="switch-slider"></span>
+                        <span>1×1 表格自动识别为代码</span>
+                    </label>
+                    <div class="format-row" style="margin-top:8px;">
+                        <span class="format-label">折叠</span>
+                        <select id="codeFoldLines" style="flex:1;font-size:11px;padding:2px 4px;">
+                            <option value="5">5 行</option>
+                            <option value="8" selected>8 行</option>
+                            <option value="12">12 行</option>
+                            <option value="20">20 行</option>
+                            <option value="0">不折叠</option>
+                        </select>
+                    </div>
+                    <div class="format-row" style="margin-top:6px;">
+                        <span class="format-label">主题</span>
+                        <select id="codeThemeSelect" style="flex:1;font-size:11px;padding:2px 4px;">
+                            <option value="auto" selected>跟随系统</option>
+                            <option value="light">亮色</option>
+                            <option value="dark">暗色</option>
+                        </select>
+                    </div>
+                    <div class="config-hint" style="margin-top:6px;">导入时将单单元格表格转为美观代码块</div>
+                    <button id="openObjectBrowser" class="btn btn-sm btn-secondary" style="width:100%;justify-content:center;margin-top:6px;">
+                        🔎 浏览代码块与表格
+                    </button>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3 class="panel-title">🔤 标题格式</h3>
+                <div class="panel-body">
+                    <div id="headingControls">
+                        <div class="format-row" data-level="1">
+                            <span class="format-label">H1</span>
+                            <input type="color" class="font-color" data-level="1" value="#000000" title="标题颜色">
+                            <select class="font-family" data-level="1">
+                                <option value="黑体">黑体</option>
+                                <option value="宋体">宋体</option>
+                                <option value="微软雅黑">微软雅黑</option>
+                                <option value="仿宋">仿宋</option>
+                                <option value="Arial">Arial</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                            </select>
+                            <select class="font-size" data-level="1">
+                                <option value="14pt">14pt</option>
+                                <option value="16pt">16pt</option>
+                                <option value="18pt">18pt</option>
+                                <option value="20pt" selected>20pt</option>
+                                <option value="22pt">22pt</option>
+                                <option value="24pt">24pt</option>
+                                <option value="26pt">26pt</option>
+                                <option value="28pt">28pt</option>
+                                <option value="36pt">36pt</option>
+                                <option value="48pt">48pt</option>
+                            </select>
+                            <label class="switch-small">
+                                <input type="checkbox" class="font-bold" data-level="1" checked>
+                                <span class="switch-slider-sm"></span>
+                            </label>
+                            <span class="bold-label">粗</span>
+                        </div>
+                        <div class="format-row" data-level="2">
+                            <span class="format-label">H2</span>
+                            <input type="color" class="font-color" data-level="2" value="#000000" title="标题颜色">
+                            <select class="font-family" data-level="2">
+                                <option value="黑体">黑体</option>
+                                <option value="宋体" selected>宋体</option>
+                                <option value="微软雅黑">微软雅黑</option>
+                                <option value="仿宋">仿宋</option>
+                                <option value="Arial">Arial</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                            </select>
+                            <select class="font-size" data-level="2">
+                                <option value="12pt">12pt</option>
+                                <option value="14pt">14pt</option>
+                                <option value="16pt" selected>16pt</option>
+                                <option value="18pt">18pt</option>
+                                <option value="20pt">20pt</option>
+                                <option value="22pt">22pt</option>
+                                <option value="24pt">24pt</option>
+                                <option value="28pt">28pt</option>
+                            </select>
+                            <label class="switch-small">
+                                <input type="checkbox" class="font-bold" data-level="2" checked>
+                                <span class="switch-slider-sm"></span>
+                            </label>
+                            <span class="bold-label">粗</span>
+                        </div>
+                        <div class="format-row" data-level="3">
+                            <span class="format-label">H3</span>
+                            <input type="color" class="font-color" data-level="3" value="#000000" title="标题颜色">
+                            <select class="font-family" data-level="3">
+                                <option value="黑体">黑体</option>
+                                <option value="宋体" selected>宋体</option>
+                                <option value="微软雅黑">微软雅黑</option>
+                                <option value="仿宋">仿宋</option>
+                                <option value="Arial">Arial</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                            </select>
+                            <select class="font-size" data-level="3">
+                                <option value="12pt">12pt</option>
+                                <option value="14pt" selected>14pt</option>
+                                <option value="15pt">15pt</option>
+                                <option value="16pt">16pt</option>
+                                <option value="18pt">18pt</option>
+                                <option value="20pt">20pt</option>
+                            </select>
+                            <label class="switch-small">
+                                <input type="checkbox" class="font-bold" data-level="3" checked>
+                                <span class="switch-slider-sm"></span>
+                            </label>
+                            <span class="bold-label">粗</span>
+                        </div>
+                        <div class="format-row" data-level="4">
+                            <span class="format-label">H4</span>
+                            <input type="color" class="font-color" data-level="4" value="#000000" title="标题颜色">
+                            <select class="font-family" data-level="4">
+                                <option value="黑体">黑体</option>
+                                <option value="宋体" selected>宋体</option>
+                                <option value="微软雅黑">微软雅黑</option>
+                                <option value="仿宋">仿宋</option>
+                                <option value="Arial">Arial</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                            </select>
+                            <select class="font-size" data-level="4">
+                                <option value="12pt" selected>12pt</option>
+                                <option value="14pt">14pt</option>
+                                <option value="15pt">15pt</option>
+                                <option value="16pt">16pt</option>
+                                <option value="18pt">18pt</option>
+                            </select>
+                            <label class="switch-small">
+                                <input type="checkbox" class="font-bold" data-level="4" checked>
+                                <span class="switch-slider-sm"></span>
+                            </label>
+                            <span class="bold-label">粗</span>
+                        </div>
+                        <div class="format-row" data-level="5">
+                            <span class="format-label">H5</span>
+                            <input type="color" class="font-color" data-level="5" value="#000000" title="标题颜色">
+                            <select class="font-family" data-level="5">
+                                <option value="黑体">黑体</option>
+                                <option value="宋体" selected>宋体</option>
+                                <option value="微软雅黑">微软雅黑</option>
+                                <option value="仿宋">仿宋</option>
+                                <option value="Arial">Arial</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                            </select>
+                            <select class="font-size" data-level="5">
+                                <option value="10pt">10pt</option>
+                                <option value="12pt" selected>12pt</option>
+                                <option value="14pt">14pt</option>
+                                <option value="15pt">15pt</option>
+                                <option value="16pt">16pt</option>
+                            </select>
+                            <label class="switch-small">
+                                <input type="checkbox" class="font-bold" data-level="5">
+                                <span class="switch-slider-sm"></span>
+                            </label>
+                            <span class="bold-label">粗</span>
+                        </div>
+                        <div class="format-row" data-level="6">
+                            <span class="format-label">H6</span>
+                            <input type="color" class="font-color" data-level="6" value="#000000" title="标题颜色">
+                            <select class="font-family" data-level="6">
+                                <option value="黑体">黑体</option>
+                                <option value="宋体" selected>宋体</option>
+                                <option value="微软雅黑">微软雅黑</option>
+                                <option value="仿宋">仿宋</option>
+                                <option value="Arial">Arial</option>
+                                <option value="Times New Roman">Times New Roman</option>
+                            </select>
+                            <select class="font-size" data-level="6">
+                                <option value="10pt">10pt</option>
+                                <option value="12pt" selected>12pt</option>
+                                <option value="14pt">14pt</option>
+                                <option value="15pt">15pt</option>
+                            </select>
+                            <label class="switch-small">
+                                <input type="checkbox" class="font-bold" data-level="6">
+                                <span class="switch-slider-sm"></span>
+                            </label>
+                            <span class="bold-label">粗</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3 class="panel-title">🔢 标题编号（默认启用）</h3>
+                <div class="panel-body">
+                    <div class="format-row">
+                        <span class="format-label">格式</span>
+                        <span style="font-size:12px;color:var(--text-secondary);">一、 / （一）/ 1.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3 class="panel-title">🤖 AI 标题助手</h3>
+                <div class="panel-body">
+                    <div class="hint-desc">
+                        将 DOCX 和 <a href="#" id="downloadRuleLink" style="color:var(--primary);text-decoration:underline;">format-rule.md</a> 给大模型，
+                        将返回的 JSON 粘贴到下方，点击应用。
+                    </div>
+                    <button id="openJsonModal" class="btn btn-sm btn-primary" style="width:100%;justify-content:center;">
+                        🧩 JSON 助手
+                    </button>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3 class="panel-title">📝 正文格式</h3>
+                <div class="panel-body">
+                    <div class="format-row">
+                        <span class="format-label">字体</span>
+                        <select id="bodyFont" class="font-family">
+                            <option value="宋体" selected>宋体</option>
+                            <option value="黑体">黑体</option>
+                            <option value="微软雅黑">微软雅黑</option>
+                            <option value="仿宋">仿宋</option>
+                            <option value="楷体">楷体</option>
+                            <option value="Arial">Arial</option>
+                            <option value="Times New Roman">Times New Roman</option>
+                        </select>
+                    </div>
+                    <div class="format-row">
+                        <span class="format-label">字号</span>
+                        <select id="bodySize" class="font-size">
+                            <option value="9pt">9pt</option>
+                            <option value="10pt">10pt</option>
+                            <option value="10.5pt" selected>10.5pt（五号）</option>
+                            <option value="11pt">11pt</option>
+                            <option value="12pt">12pt（小四）</option>
+                            <option value="14pt">14pt（四号）</option>
+                            <option value="15pt">15pt</option>
+                            <option value="16pt">16pt</option>
+                        </select>
+                    </div>
+                    <div class="format-row">
+                        <span class="format-label">行距</span>
+                        <select id="bodyLineHeight">
+                            <option value="1">1.0</option>
+                            <option value="1.15">1.15</option>
+                            <option value="1.5" selected>1.5</option>
+                            <option value="2.0">2.0</option>
+                            <option value="2.5">2.5</option>
+                        </select>
+                    </div>
+                    <button id="applyBodyFormat" class="btn btn-sm btn-accent">应用正文格式</button>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3 class="panel-title">⚙️ 配置管理</h3>
+                <div class="panel-body">
+                    <div class="config-actions">
+                        <button id="saveConfigBtn" class="btn btn-sm btn-primary" title="保存当前配置到文件">💾 导出配置</button>
+                        <button id="loadConfigBtn" class="btn btn-sm btn-secondary" title="从文件加载配置">📂 导入配置</button>
+                        <input type="file" id="configFileInput" accept=".json" hidden>
+                    </div>
+                    <div class="config-hint">启动时自动读取项目目录；导出可选保存位置</div>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3 class="panel-title">🔍 查找与替换</h3>
+                <div class="panel-body">
+                    <button id="openSearchModal" class="btn btn-sm btn-primary" style="width:100%;justify-content:center;">
+                        🔍 打开查找与替换
+                    </button>
+                    <div class="config-hint" style="margin-top:4px;">快捷键 Ctrl+F / Ctrl+H</div>
+                </div>
+            </div>
+
+            <!-- 快捷键说明已移至帮助弹窗（点击工具栏 ❓ 按钮） -->
+        </aside>
+
+        <!-- 中间编辑区 -->
+        <main class="editor-area">
+            <div id="editorContainer" class="editor-container">
+                <div class="editor-wrapper">
+                    <div id="anchorGutter" class="anchor-gutter" title="点击左侧装订线添加/移除锚点"></div>
+                    <div id="editor" class="editor" contenteditable="true">
+                        <div class="placeholder">点击"导入 DOCX"按钮加载文档，或直接在此编辑...</div>
+                    </div>
+                    <div id="foldGutter" class="fold-gutter" title="点击右侧装订线添加折叠标记点，在两个点之间可折叠文章"></div>
+                </div>
+            </div>
+            <!-- 加载提示 -->
+            <div id="loadingOverlay" class="loading-overlay hidden">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p id="loadingText">正在处理中...</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧目录面板 -->
+        <aside class="right-panel" id="rightPanel">
+            <div class="panel-section toc-section">
+                <h3 class="panel-title">📑 文档目录</h3>
+                <div class="toc-toolbar">
+                    <button id="tocRefresh" class="btn btn-sm btn-secondary" title="刷新目录">🔄</button>
+                    <button id="tocCollapseAll" class="btn btn-sm btn-secondary" title="全部收起">📁</button>
+                    <button id="tocExpandAll" class="btn btn-sm btn-secondary" title="全部展开">📂</button>
+                </div>
+                <div class="panel-body toc-body" id="tocContainer">
+                    <div class="toc-empty">暂无标题，请先添加标题<br>使用 Ctrl+1~6 设置标题</div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- ❓ 帮助弹窗（可拖动、多标签、非模态） -->
+    <div id="helpWindow" class="help-window hidden">
+        <div id="helpHeader" class="help-header">
+            <span class="help-header-title">❓ 帮助</span>
+            <button id="helpClose" class="btn btn-icon" title="关闭" style="width:24px;height:24px;font-size:14px;line-height:1;">✕</button>
+        </div>
+        <div class="help-tabs">
+            <button class="help-tab active" data-tab="shortcuts">⌨️ 快捷键</button>
+            <button class="help-tab" data-tab="headings">📋 格式</button>
+            <button class="help-tab" data-tab="image">🖼️ 图片</button>
+            <button class="help-tab" data-tab="nav">📌 导航</button>
+            <button class="help-tab" data-tab="tips">💡 技巧</button>
+        </div>
+        <div class="help-body">
+            <!-- ===== 快捷键标签页 ===== -->
+            <div class="help-tab-content active" id="helpTabShortcuts">
+                <h4 style="margin:0 0 6px;">📂 文件操作</h4>
+                <table class="shortcuts-table">
+                    <tbody>
+                        <tr><td><kbd>Ctrl+O</kbd></td><td>导入 DOCX 文件</td></tr>
+                        <tr><td><kbd>Ctrl+S</kbd></td><td>保存到本地存储</td></tr>
+                        <tr><td><kbd>Ctrl+Shift+S</kbd></td><td>导出为 DOCX 文件</td></tr>
+                        <tr><td><kbd>Ctrl+N</kbd></td><td>新建文档标签（最多3个）</td></tr>
+                        <tr><td><kbd>Ctrl+Tab</kbd></td><td>切换到下一个标签</td></tr>
+                        <tr><td><kbd>Ctrl+W</kbd></td><td>关闭当前标签</td></tr>
+                    </tbody>
+                </table>
+                <h4 style="margin:10px 0 6px;">✏️ 编辑操作</h4>
+                <table class="shortcuts-table">
+                    <tbody>
+                        <tr><td><kbd>Ctrl+Z</kbd></td><td>撤销</td></tr>
+                        <tr><td><kbd>Ctrl+Y</kbd></td><td>重做</td></tr>
+                        <tr><td><kbd>Ctrl+B</kbd></td><td>加粗 / 取消加粗</td></tr>
+                        <tr><td><kbd>Ctrl+I</kbd></td><td>斜体 / 取消斜体</td></tr>
+                        <tr><td><kbd>Ctrl+U</kbd></td><td>下划线 / 取消下划线</td></tr>
+                        <tr><td><kbd>Ctrl+1~6</kbd></td><td>设置为一~六级标题</td></tr>
+                        <tr><td><kbd>Ctrl+0</kbd></td><td>取消标题（转为正文）</td></tr>
+                    </tbody>
+                </table>
+                <h4 style="margin:10px 0 6px;">🔍 查找与搜索</h4>
+                <table class="shortcuts-table">
+                    <tbody>
+                        <tr><td><kbd>Ctrl+F</kbd></td><td>打开查找面板</td></tr>
+                        <tr><td><kbd>Ctrl+H</kbd></td><td>打开查找与替换面板</td></tr>
+                        <tr><td><kbd>F3</kbd></td><td>下一个匹配项</td></tr>
+                        <tr><td><kbd>Shift+F3</kbd></td><td>上一个匹配项</td></tr>
+                    </tbody>
+                </table>
+                <h4 style="margin:10px 0 6px;">📌 锚点与导航</h4>
+                <table class="shortcuts-table">
+                    <tbody>
+                        <tr><td><kbd>F9</kbd></td><td>在光标所在段落添加/移除锚点</td></tr>
+                        <tr><td><kbd>Ctrl+Shift+↑</kbd></td><td>跳转到上一个锚点</td></tr>
+                        <tr><td><kbd>Ctrl+Shift+↓</kbd></td><td>跳转到下一个锚点</td></tr>
+                    </tbody>
+                </table>
+                <h4 style="margin:10px 0 6px;">🖥️ 视图与工具</h4>
+                <table class="shortcuts-table">
+                    <tbody>
+                        <tr><td><kbd>F1</kbd></td><td>打开 / 关闭帮助</td></tr>
+                        <tr><td><kbd>F11</kbd></td><td>切换全屏模式</td></tr>
+                    </tbody>
+                </table>
+                <h4 style="margin:10px 0 6px;">🖼️ 图片编辑器（打开后可用）</h4>
+                <table class="shortcuts-table">
+                    <tbody>
+                        <tr><td><kbd>S</kbd></td><td>选择/移动工具</td></tr>
+                        <tr><td><kbd>P</kbd></td><td>画笔（自由绘制）</td></tr>
+                        <tr><td><kbd>E</kbd></td><td>橡皮擦</td></tr>
+                        <tr><td><kbd>T</kbd></td><td>文本框</td></tr>
+                        <tr><td><kbd>R</kbd></td><td>方框</td></tr>
+                        <tr><td><kbd>L</kbd></td><td>直线</td></tr>
+                        <tr><td><kbd>A</kbd></td><td>箭头</td></tr>
+                        <tr><td><kbd>C</kbd></td><td>裁剪模式</td></tr>
+                        <tr><td><kbd>+</kbd>/<kbd>=</kbd></td><td>放大</td></tr>
+                        <tr><td><kbd>-</kbd></td><td>缩小</td></tr>
+                        <tr><td><kbd>0</kbd></td><td>适应窗口</td></tr>
+                        <tr><td><kbd>Esc</kbd></td><td>取消当前操作 / 关闭编辑器</td></tr>
+                        <tr><td><kbd>Ctrl+Z</kbd></td><td>撤销绘图操作</td></tr>
+                        <tr><td><kbd>Ctrl+Y</kbd></td><td>重做绘图操作</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ===== 格式指南标签页 ===== -->
+            <div class="help-tab-content" id="helpTabHeadings">
+                <h4 style="margin:0 0 8px;">📋 中文标题编号规则</h4>
+                <table class="shortcuts-table">
+                    <thead><tr><th>级别</th><th>编号样式</th><th>示例</th></tr></thead>
+                    <tbody>
+                        <tr><td>一级标题 (H1)</td><td>一、二、三…</td><td><b>一、引言</b></td></tr>
+                        <tr><td>二级标题 (H2)</td><td>（一）（二）（三）…</td><td><b>（一）背景介绍</b></td></tr>
+                        <tr><td>三级标题 (H3)</td><td>1. 2. 3. …</td><td><b>1. 研究现状</b></td></tr>
+                        <tr><td>四级标题 (H4)</td><td>（1）（2）（3）…</td><td><b>（1）数据来源</b></td></tr>
+                        <tr><td>五级标题 (H5)</td><td>① ② ③ …</td><td><b>① 样本A</b></td></tr>
+                        <tr><td>六级标题 (H6)</td><td>a. b. c. …</td><td><b>a. 子项说明</b></td></tr>
+                    </tbody>
+                </table>
+                <h4 style="margin:12px 0 8px;">🎛️ 标题格式自定义</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li>在左侧 <b>配置管理</b> 面板可修改各级标题的编号样式（如改为 <code>&#12300;一&#12301;</code> 等）</li>
+                    <li>取消勾选 <b>"自动编号"</b> 可隐藏所有标题编号</li>
+                    <li>编号随标题增删和层级变化自动重新计算</li>
+                    <li>正文默认字体和字号也在配置面板中修改</li>
+                </ul>
+                <h4 style="margin:12px 0 8px;">📝 正文格式</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li>默认正文：宋体 / 小四（12pt）/ 行距 1.5</li>
+                    <li>使用 <kbd>Ctrl+B</kbd> / <kbd>Ctrl+I</kbd> / <kbd>Ctrl+U</kbd> 快速加粗、斜体、下划线</li>
+                    <li>选中文字后可用工具栏或右键菜单调整字体、字号、颜色</li>
+                </ul>
+            </div>
+
+            <!-- ===== 图片编辑器标签页 ===== -->
+            <div class="help-tab-content" id="helpTabImage">
+                <h4 style="margin:0 0 8px;">🖱️ 打开图片编辑器</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li>在编辑器中的图片上 <b>右键点击</b>，弹出菜单选择：</li>
+                    <li style="list-style:none;margin:4px 0 0 18px;">🔍 <b>查看图片</b> — 查看模式，支持缩放和拖拽</li>
+                    <li style="list-style:none;margin-left:18px;">✏️ <b>编辑图片</b> — 编辑模式，可添加标注</li>
+                    <li style="list-style:none;margin-left:18px;">✂️ <b>裁剪图片</b> — 裁剪模式，选区裁剪</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">🔍 查看模式</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li><b>滚轮缩放</b>：鼠标滚轮放大/缩小图片（10%~500%）</li>
+                    <li><b>拖拽平移</b>：放大后按住鼠标拖拽可平移查看</li>
+                    <li><b>适应窗口</b>：点击工具栏 <b>适应窗口</b> 按钮或按 <kbd>0</kbd> 将图片缩放到窗口大小</li>
+                    <li>工具栏按钮：<b>放大 +</b> / <b>缩小 -</b> / <b>适应窗口</b></li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">✏️ 编辑模式 — 绘图工具</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li>🖊️ <b>画笔 (P)</b>：自由绘制线条，可调颜色和线宽</li>
+                    <li>🧹 <b>橡皮 (E)</b>：擦除标注（擦除与路径相交的标注对象）</li>
+                    <li>📝 <b>文本框 (T)</b>：点击图片放置文字，支持中文输入</li>
+                    <li>⬜ <b>方框 (R)</b>：绘制矩形框，可用于标注重点区域</li>
+                    <li>📏 <b>直线 (L)</b>：绘制直线</li>
+                    <li>➡️ <b>箭头 (A)</b>：绘制箭头，指向关键位置</li>
+                    <li>✂️ <b>裁剪 (C)</b>：进入裁剪模式，拖拽选择区域</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">🎨 工具栏功能</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li><b>颜色选择器</b>：设置画笔、方框、直线、箭头的颜色</li>
+                    <li><b>线宽滑块</b>：设置画笔和线条的粗细（1~20px）</li>
+                    <li><b>撤销/重做</b>：<kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>，最多 50 步</li>
+                    <li><b>缩放</b>：+ / - / 适应窗口（快捷键 <kbd>+</kbd> / <kbd>-</kbd> / <kbd>0</kbd>）</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">✂️ 裁剪模式</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li>在图片上 <b>拖拽鼠标</b> 框选需要保留的区域</li>
+                    <li>选区四角和四边有 <b>8 个拖拽手柄</b>，可调整选区大小</li>
+                    <li>选区内部可 <b>拖拽移动</b> 整个选区位置</li>
+                    <li>辅助线：<b>九宫格虚线</b> 帮助构图</li>
+                    <li>点击底部 <b>✅ 确认裁剪</b> 完成裁剪</li>
+                    <li>点击 <b>❌ 取消</b> 或按 <kbd>Esc</kbd> 退出裁剪</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">💾 应用与放弃</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li><b>✅ 应用修改</b>：将编辑后的图片（含标注/裁剪结果）写回编辑器，触发自动保存</li>
+                    <li><b>❌ 放弃修改</b>：丢弃所有标注和裁剪，恢复原始图片</li>
+                    <li>修改后的图片以 base64 格式嵌入文档，导出 DOCX 时一并包含</li>
+                </ul>
+            </div>
+
+            <!-- ===== 导航工具标签页 ===== -->
+            <div class="help-tab-content" id="helpTabNav">
+                <h4 style="margin:0 0 8px;">📌 锚点功能</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li><b>添加锚点</b>：将光标放在段落中，按 <kbd>F9</kbd> 或在左侧装订线点击目标段落位置</li>
+                    <li><b>移除锚点</b>：再次按 <kbd>F9</kbd> 或点击装订线中的红色圆点</li>
+                    <li><b>锚点面板</b>：点击工具栏 <b>📌 锚点</b> 按钮打开面板，查看所有锚点列表</li>
+                    <li><b>跳转</b>：在面板中点击 <b>跳转</b> 按钮，或使用 <kbd>Ctrl+Shift+↑</kbd>/<kbd>↓</kbd></li>
+                    <li><b>快捷键导航</b>：面板中 <b>上一个/下一个</b> 按钮逐一跳转，目标段落会高亮闪烁</li>
+                    <li><b>清除全部</b>：面板底部提供一键清除所有锚点</li>
+                    <li>锚点数据随文档保存到 IndexedDB，刷新后自动恢复</li>
+                    <li>装订线在编辑器纸张左侧，锚点段落旁显示 <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ef4444;vertical-align:middle;"></span> 红色圆点标记</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">📁 折叠功能</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li><b>添加折叠区域</b>：在任意两个段落分别设置锚点，即形成一段可折叠区域</li>
+                    <li><b>折叠/展开</b>：点击装订线中两个锚点之间的 <b>括号标记 【</b> 切换折叠状态</li>
+                    <li><b>折叠面板</b>：点击工具栏 <b>📁 折叠</b> 按钮，查看所有折叠区域并管理</li>
+                    <li>折叠后可隐藏中间段落内容，便于专注编辑其他部分</li>
+                    <li>折叠数据随文档保存到 IndexedDB</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">📑 目录导航</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li>右侧 <b>目录 (TOC)</b> 面板自动从标题生成层级结构</li>
+                    <li>点击目录中的标题可直接 <b>滚动跳转</b> 到对应位置</li>
+                    <li>目录随编辑器内容变化实时更新</li>
+                </ul>
+            </div>
+
+            <!-- ===== 使用技巧标签页 ===== -->
+            <div class="help-tab-content" id="helpTabTips">
+                <h4 style="margin:0 0 8px;">🚀 快速上手</h4>
+                <ol style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li>点击 <b>📂 导入 DOCX</b> 或 <kbd>Ctrl+O</kbd> 打开一个 Word 文档</li>
+                    <li>直接在编辑器中编辑，格式自动保留</li>
+                    <li>点击 <b>💾 导出 DOCX</b> 或 <kbd>Ctrl+Shift+S</kbd> 保存结果</li>
+                    <li>编辑过程中数据 <b>自动保存</b> 到浏览器本地存储</li>
+                </ol>
+
+                <h4 style="margin:12px 0 8px;">💡 进阶功能</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li><b>🖌️ 格式刷</b>：点击格式刷按钮后，先点击源段落复制格式，再点击（或框选）目标段落应用</li>
+                    <li><b>🤖 AI 标题助手</b>：将文档内容与 <code>format-rule.md</code> 一起发给大模型，把返回的 JSON 粘贴到助手面板，自动在锚点位置插入标题</li>
+                    <li><b>😊 表情栏</b>：点击工具栏表情按钮，在光标位置插入 emoji，可在左侧面板自定义分类和常用表情</li>
+                    <li><b>💻 代码块</b>：支持语法高亮和行号，导入 DOCX 时 1×1 表格自动转为代码块</li>
+                    <li><b>📊 表格</b>：支持单元格合并、行列增删、对齐和边框设置，右键表格可快速操作</li>
+                    <li><b>🎨 自由绘图</b>：点击工具栏 🎨 绘图按钮进入画板模式，支持形状、流程图、思维导图</li>
+                    <li><b>🐾 陪伴宠物</b>：编辑器右下角有三只可选宠物（🐱小橘猫、🐶旺财狗、🐰雪球兔），会响应写作节奏产生不同反应、随机鼓励气泡；可在右侧面板切换宠物和编辑宠物档案（姓名、年龄、生日、身高、体重、学历、爱好等）</li>
+                    <li><b>🖨️ 打印</b>：点击打印按钮生成适合打印的版式页面</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">💾 数据存储与备份</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li><b>主存储</b>：基于浏览器 <b>IndexedDB</b>，数据完全本地，无需网络</li>
+                    <li><b>自动保存</b>：每次输入后 2 秒防抖自动保存；每 30 秒周期保存</li>
+                    <li><b>关闭保护</b>：关闭或刷新页面时弹出离开确认对话框，同步写入 localStorage 兜底</li>
+                    <li><b>恢复机制</b>：重新打开页面时自动从 IndexedDB 恢复，失败则从 localStorage 恢复</li>
+                    <li><b>多标签存储</b>：最多 3 个文档标签页，每个标签文档独立保存</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">⚙️ 配置管理</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li>左侧面板可调整 <b>标题格式</b>、<b>正文字体</b>、<b>字号</b>、<b>行距</b></li>
+                    <li>点击 <b>💾 导出配置</b> 将当前设置保存为 <code>docx-editor-config.json</code> 文件</li>
+                    <li>点击 <b>📂 导入配置</b> 从文件恢复配置</li>
+                    <li>将配置文件放在项目目录下，启动时自动读取</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">🎨 界面与环境</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li><b>🌙 暗色主题</b>：点击工具栏月亮按钮切换亮/暗主题，适合夜间写作</li>
+                    <li><b>⛶ 全屏模式</b>：按 <kbd>F11</kbd> 进入浏览器全屏，沉浸式编辑</li>
+                    <li><b>📊 实时统计</b>：底部状态栏显示字数、行数、图片数、代码块数、表格数、文件大小、编辑时长</li>
+                    <li><b>右键菜单</b>：编辑器内右键提供快捷操作（表格编辑、图片编辑、文本格式等）</li>
+                    <li><b>🔍 查找替换</b>：<kbd>Ctrl+F</kbd> 查找，<kbd>Ctrl+H</kbd> 查找并替换，支持大小写敏感</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">📄 文件兼容性</h4>
+                <ul style="margin:0;padding-left:18px;font-size:12px;color:var(--text-secondary);line-height:1.9;">
+                    <li>支持导入 <b>.docx</b> 格式（基于 mammoth.js）</li>
+                    <li>导出为标准 <b>Office Open XML</b> 格式，兼容 Microsoft Word / WPS</li>
+                    <li>图片以 <b>base64</b> 嵌入文档，无需外部资源文件</li>
+                    <li>支持 <b>表格</b>、<b>代码块</b>、<b>标题层级</b>、<b>图片标注</b> 的完整导入→编辑→导出往返</li>
+                </ul>
+
+                <h4 style="margin:12px 0 8px;">⌨️ 提示</h4>
+                <p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);line-height:1.6;">
+                    按 <kbd>F1</kbd> 随时打开本帮助弹窗。帮助弹窗可 <b>拖拽标题栏</b> 移动位置，不会被其他窗口遮挡。更多快捷键请查看 <b>⌨️ 快捷键</b> 标签页。
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 本地库加载（无需网络） -->
+    <script src="js/lib/mammoth.browser.min.js"></script>
+    <script src="js/lib/jszip.min.js"></script>
+    <script src="js/lib/FileSaver.min.js"></script>
+    <!-- 主应用脚本 -->
+    <script src="js/app.js"></script>
+    <script src="js/export.js"></script>
+    <script>
+        // 检查库加载状态
+        (function() {
+            var status = [];
+            status.push('mammoth: ' + (typeof mammoth !== 'undefined' ? '✓' : '✗'));
+            status.push('JSZip: ' + (typeof JSZip !== 'undefined' ? '✓' : '✗'));
+            status.push('saveAs: ' + (typeof saveAs !== 'undefined' ? '✓' : '✗'));
+            console.log('库加载状态:', status.join(', '));
+            var el = document.getElementById('docStatus');
+            if (el && (typeof mammoth === 'undefined' || typeof JSZip === 'undefined')) {
+                el.textContent = '⚠ 部分库加载失败';
+                el.style.color = '#dc2626';
+            }
+        })();
+    </script>
+
+    <!-- 🐾 宠物档案编辑模态框 -->
+    <div id="petProfileOverlay" class="pet-profile-overlay hidden" role="dialog" aria-modal="true" onclick="if(event.target===this)window.__petCloseProfile()">
+        <div class="pet-profile-dialog">
+            <div class="pet-profile-header">
+                <h3 id="petProfileTitle">✏️ 编辑宠物档案</h3>
+                <button id="petProfileClose" class="pet-profile-close" title="关闭" onclick="window.__petCloseProfile()">✕</button>
+            </div>
+            <div class="pet-profile-body">
+                <div class="pet-profile-avatar" id="petProfileAvatar">🐱</div>
+                <div class="pet-profile-fields">
+                    <div class="pet-field">
+                        <label>姓名</label>
+                        <input type="text" id="petFieldName" placeholder="宠物姓名" maxlength="20">
+                    </div>
+                    <div class="pet-field">
+                        <label>小名</label>
+                        <input type="text" id="petFieldNickname" placeholder="昵称" maxlength="20">
+                    </div>
+                    <div class="pet-field">
+                        <label>性别</label>
+                        <select id="petFieldGender">
+                            <option value="♂ 男生">♂ 男生</option>
+                            <option value="♀ 女生">♀ 女生</option>
+                        </select>
+                    </div>
+                    <div class="pet-field">
+                        <label>年龄</label>
+                        <input type="text" id="petFieldAge" placeholder="例如：2岁" maxlength="10">
+                    </div>
+                    <div class="pet-field">
+                        <label>生日</label>
+                        <input type="date" id="petFieldBirthday">
+                    </div>
+                    <div class="pet-field">
+                        <label>身高</label>
+                        <input type="text" id="petFieldHeight" placeholder="例如：25cm" maxlength="10">
+                    </div>
+                    <div class="pet-field">
+                        <label>体重</label>
+                        <input type="text" id="petFieldWeight" placeholder="例如：4.5kg" maxlength="10">
+                    </div>
+                    <div class="pet-field">
+                        <label>学历</label>
+                        <input type="text" id="petFieldEducation" placeholder="例如：喵星小学毕业" maxlength="30">
+                    </div>
+                    <div class="pet-field">
+                        <label>爱好</label>
+                        <input type="text" id="petFieldHobby" placeholder="例如：晒太阳、抓玩具" maxlength="50">
+                    </div>
+                    <div class="pet-field">
+                        <label>性格</label>
+                        <input type="text" id="petFieldPersonality" placeholder="例如：活泼好动、粘人" maxlength="50">
+                    </div>
+                </div>
+            </div>
+            <div class="pet-profile-footer">
+                <button id="petProfileReset" class="btn btn-sm btn-secondary" onclick="window.__petResetProfile()">恢复默认</button>
+                <button id="petProfileCancel" class="btn btn-sm btn-secondary" onclick="window.__petCloseProfile()">取消</button>
+                <button id="petProfileSave" class="btn btn-sm btn-primary" onclick="window.__petSaveProfile()">💾 保存档案</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 离开确认弹窗（自定义，绕过浏览器原生限制） -->
+    <div id="leaveConfirmOverlay" class="leave-confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="leaveConfirmTitle">
+        <div class="leave-confirm-dialog">
+            <div class="leave-confirm-icon">⚠️</div>
+            <h3 id="leaveConfirmTitle" class="leave-confirm-title">确定要离开吗？</h3>
+            <p id="leaveConfirmMessage" class="leave-confirm-message">
+                您确定要离开此页面吗？<br>建议先导出或保存文档，避免数据丢失。
+            </p>
+            <div class="leave-confirm-actions">
+                <button id="leaveConfirmStay" class="btn btn-primary">留在页面</button>
+                <button id="leaveConfirmGo" class="btn btn-danger">离开页面</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
