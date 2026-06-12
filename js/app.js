@@ -2290,7 +2290,33 @@
         if (!sel.rangeCount) return;
         var node = sel.getRangeAt(0).commonAncestorContainer;
         while (node && node !== editor && !/^H[1-6]$|^P$|^DIV$|^LI$|^TD$/.test(node.tagName || '')) node = node.parentNode;
-        if (!node || node === editor) return;
+
+        // 处理文本直接位于 contenteditable 内的情况（无 P/DIV 包裹）
+        // 此时 node === editor，无法替换 editor 本身，需要用 formatBlock 包裹文本
+        if (!node || node === editor) {
+            if (node === editor) {
+                // 使用浏览器原生 formatBlock 将当前文本块包裹为标题
+                document.execCommand('formatBlock', false, '<H' + level + '>');
+                // 从当前选区向上查找新创建的标题元素
+                var newH = null;
+                var pn = sel.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null;
+                while (pn && pn !== editor) {
+                    if (pn.tagName === 'H' + level) { newH = pn; break; }
+                    pn = pn.parentNode;
+                }
+                if (newH) {
+                    var cfg = headingConfig[level];
+                    if (cfg) {
+                        newH.style.fontFamily = cfg.family;
+                        newH.style.fontSize = cfg.size;
+                        newH.style.fontWeight = cfg.bold ? 'bold' : 'normal';
+                        if (cfg.color && cfg.color !== '#000000') newH.style.color = cfg.color;
+                    }
+                }
+                renumber(); generateTOC(); setStatus('Set to H' + level);
+            }
+            return;
+        }
         if (node.tagName === 'H' + level) {
             var p = document.createElement('p');
             p.innerHTML = node.innerHTML;
