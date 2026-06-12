@@ -238,16 +238,14 @@
             body += convertNode(child);
         });
 
+        // 图片相关命名空间（有图时需要；纯文本时仅声明也不影响）
+        const imgNs = EXPORT.images.length > 0
+            ? ` xmlns:wp="${NS.wp}" xmlns:a="${NS.a}" xmlns:pic="${NS.pic}"`
+            : '';
         return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="${NS.w}" xmlns:r="${NS.r}" xmlns:wp="${NS.wp}" xmlns:a="${NS.a}"
-            xmlns:pic="${NS.pic}" xmlns:mc="${NS.mc}" xmlns:wps="${NS.wps}"
-            xmlns:v="${NS.v}" xmlns:wpc="${NS.wpc}">
+<w:document xmlns:w="${NS.w}" xmlns:r="${NS.r}"${imgNs}>
     <w:body>
         ${body || '<w:p><w:r><w:t> </w:t></w:r></w:p>'}
-        <w:sectPr>
-            <w:pgSz w:w="11906" w:h="16838"/>
-            <w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720"/>
-        </w:sectPr>
     </w:body>
 </w:document>`;
     }
@@ -258,7 +256,7 @@
         if (node.nodeType === Node.TEXT_NODE) {
             const t = node.textContent;
             if (!t.trim()) return '';
-            return `<w:r><w:rPr>${bodyRPr()}</w:rPr><w:t xml:space="preserve">${escXml(t)}</w:t></w:r>`;
+            return `<w:r><w:t>${escXml(t)}</w:t></w:r>`;
         }
         if (node.nodeType !== Node.ELEMENT_NODE) return '';
 
@@ -272,7 +270,9 @@
         if (tag === 'div' && node.classList && node.classList.contains('code-block')) {
             return convertCodeBlock(node);
         }
-        if (['div', 'section', 'article', 'main', 'blockquote', 'figure', 'figcaption'].includes(tag)) {
+        // Chromium contenteditable 使用 <div> 作为段落容器，和 <p> 一样处理
+        if (tag === 'div') return convertParagraph(node);
+        if (['section', 'article', 'main', 'blockquote', 'figure', 'figcaption'].includes(tag)) {
             let r = '';
             node.childNodes.forEach(c => r += convertNode(c));
             return r;
@@ -311,18 +311,11 @@
         let runs = '';
         node.childNodes.forEach(c => runs += convertNode(c));
         if (!runs.trim()) {
-            runs = `<w:r><w:rPr>${bodyRPr()}</w:rPr><w:t xml:space="preserve"> </w:t></w:r>`;
+            runs = `<w:r><w:t> </w:t></w:r>`;
         }
 
-        const style = node.style || {};
-        let pPr = '';
-        const align = style.textAlign || (node.getAttribute ? node.getAttribute('align') : '');
-        if (align) pPr += `<w:jc w:val="${align}"/>`;
-
-        const lh = EXPORT.bodyFormat.lineHeight || '1.5';
-        pPr += `<w:spacing w:before="60" w:after="60" w:line="${Math.round(parseFloat(lh) * 240)}" w:lineRule="auto"/>`;
-
-        return `<w:p>${pPr ? `<w:pPr>${pPr}</w:pPr>` : ''}${runs}</w:p>`;
+        // 纯文本段落，无段落布局属性（段落柄）
+        return `<w:p>${runs}</w:p>`;
     }
 
     // ===== 代码块 =====
@@ -432,7 +425,7 @@
             if (child.nodeType === Node.TEXT_NODE) {
                 var t = child.textContent;
                 if (t.trim()) {
-                    runs += '<w:r><w:rPr>' + headingRPr(family, size, bold, colorHex) + '</w:rPr><w:t xml:space="preserve">' + escXml(t) + '</w:t></w:r>';
+                    runs += '<w:r><w:rPr>' + headingRPr(family, size, bold, colorHex) + '</w:rPr><w:t>' + escXml(t) + '</w:t></w:r>';
                 }
             } else if (child.nodeType === Node.ELEMENT_NODE) {
                 var ctag = child.tagName.toLowerCase();
@@ -441,7 +434,7 @@
                 } else if (child.classList && child.classList.contains('heading-number')) {
                     var t = child.textContent;
                     if (t.trim()) {
-                        runs += '<w:r><w:rPr>' + headingRPr(family, size, bold, colorHex) + '</w:rPr><w:t xml:space="preserve">' + escXml(t) + '</w:t></w:r>';
+                        runs += '<w:r><w:rPr>' + headingRPr(family, size, bold, colorHex) + '</w:rPr><w:t>' + escXml(t) + '</w:t></w:r>';
                     }
                 } else if (['b', 'strong', 'i', 'em', 'u'].indexOf(ctag) !== -1) {
                     var rb = bold, ri = false, ru = false;
@@ -453,7 +446,7 @@
                     if (ru) rp += '<w:u w:val="single"/>';
                     var t = child.textContent;
                     if (t.trim()) {
-                        runs += '<w:r><w:rPr>' + rp + '</w:rPr><w:t xml:space="preserve">' + escXml(t) + '</w:t></w:r>';
+                        runs += '<w:r><w:rPr>' + rp + '</w:rPr><w:t>' + escXml(t) + '</w:t></w:r>';
                     }
                 } else {
                     runs += convertNode(child);
@@ -462,25 +455,11 @@
         });
 
         if (!runs) {
-            runs = '<w:r><w:rPr>' + headingRPr(family, size, bold, colorHex) + '</w:rPr><w:t xml:space="preserve">' + escXml(node.textContent || ' ') + '</w:t></w:r>';
+            runs = '<w:r><w:rPr>' + headingRPr(family, size, bold, colorHex) + '</w:rPr><w:t>' + escXml(node.textContent || ' ') + '</w:t></w:r>';
         }
 
-        // 纯 Normal 段落 + 更大的前后间距，无任何编号相关元素
-        // H1 额外添加分隔线（如果编辑器开启了 show-h1-sep）
-        var h1Sep = false;
-        try { h1Sep = window.__editor && window.__editor.classList && window.__editor.classList.contains('show-h1-sep'); } catch(e) {}
-        var pPr = '<w:spacing w:before="240" w:after="120"/>' +
-                  '<w:ind w:left="0" w:right="0" w:firstLine="0"/>';
-        if (h1Sep && level === 1) {
-            pPr += '<w:pBdr>' +
-                      '<w:top w:val="single" w:sz="4" w:space="8" w:color="999999"/>' +
-                      '<w:bottom w:val="single" w:sz="4" w:space="8" w:color="999999"/>' +
-                   '</w:pBdr>';
-        }
-        return '<w:p>' +
-            '<w:pPr>' + pPr + '</w:pPr>' +
-            runs +
-        '</w:p>';
+        // 纯文本标题，标题/正文区分仅靠 <w:rPr>（字体/字号/颜色），无段落布局
+        return '<w:p>' + runs + '</w:p>';
     }
 
     // ===== 表格 (完整实现) =====
@@ -520,11 +499,11 @@
                 let content = '';
                 const childNodes = cell.childNodes;
                 if (childNodes.length === 0) {
-                    content = '<w:p><w:r><w:rPr>' + bodyRPr() + '</w:rPr><w:t> </w:t></w:r></w:p>';
+                    content = '<w:p><w:r><w:t> </w:t></w:r></w:p>';
                 } else {
                     childNodes.forEach(ch => {
                         if (ch.nodeType === Node.TEXT_NODE && ch.textContent.trim()) {
-                            content += `<w:p><w:r><w:rPr>${bodyRPr()}</w:rPr><w:t xml:space="preserve">${escXml(ch.textContent)}</w:t></w:r></w:p>`;
+                            content += `<w:p><w:r><w:t>${escXml(ch.textContent)}</w:t></w:r></w:p>`;
                         } else if (ch.nodeType === Node.ELEMENT_NODE) {
                             const ct = ch.tagName.toLowerCase();
                             if (ct === 'p') content += convertParagraph(ch);
@@ -584,7 +563,7 @@
         let runs = '';
         node.childNodes.forEach(c => runs += convertNode(c));
         if (!runs.trim()) {
-            runs = `<w:r><w:rPr>${bodyRPr()}</w:rPr><w:t xml:space="preserve"> </w:t></w:r>`;
+            runs = `<w:r><w:t> </w:t></w:r>`;
         }
         const lh = EXPORT.bodyFormat.lineHeight || '1.5';
         return `<w:p>
@@ -600,8 +579,8 @@
     // ===== 内联元素 =====
     function convertInline(node) {
         const tag = node.tagName.toLowerCase();
-        let rPr = bodyRPr();
-        if (['b','strong'].includes(tag)) rPr += '<w:b/><w:bCs/>';
+        let rPr = '';
+        if (['b','strong'].includes(tag)) rPr += '<w:b/>';
         if (['i','em'].includes(tag)) rPr += '<w:i/>';
         if (tag === 'u') rPr += '<w:u w:val="single"/>';
         if (tag === 's' || tag === 'del') rPr += '<w:strike/>';
@@ -609,8 +588,8 @@
         if (tag === 'sup') rPr += '<w:vertAlign w:val="superscript"/>';
         if (tag === 'code' || tag === 'samp') {
             // 用等宽字体覆盖
-            rPr += '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="Consolas" w:cs="Consolas"/>';
-            rPr += '<w:sz w:val="18"/><w:szCs w:val="18"/>';
+            rPr += '<w:rFonts w:ascii="Consolas" w:eastAsia="Consolas"/>';
+            rPr += '<w:sz w:val="18"/>';
         }
 
         // 兼容 <font> 标签（部分浏览器 execCommand 的遗留产物）
@@ -623,27 +602,27 @@
             const ff = node.getAttribute('face') || '';
             if (ff) {
                 const fArr = ff.split(',')[0].trim().replace(/["']/g, '');
-                if (fArr) rPr += `<w:rFonts w:ascii="${fArr}" w:hAnsi="${fArr}" w:eastAsia="${fArr}"/>`;
+                if (fArr) rPr += `<w:rFonts w:ascii="${fArr}" w:eastAsia="${fArr}"/>`;
             }
             const fs = node.getAttribute('size') || '';
             if (fs) {
                 // HTML font size 1-7 映射到近似 pt
                 const sizeMap = { '1':'7.5pt', '2':'10pt', '3':'12pt', '4':'13.5pt', '5':'18pt', '6':'24pt', '7':'36pt' };
                 const mapped = sizeMap[fs] || (parseInt(fs) * 3 + 'pt');
-                rPr += `<w:sz w:val="${ptToHalfPoint(mapped)}"/><w:szCs w:val="${ptToHalfPoint(mapped)}"/>`;
+                rPr += `<w:sz w:val="${ptToHalfPoint(mapped)}"/>`;
             }
         }
 
         if (tag === 'span' && node.style) {
-            if (node.style.fontWeight === 'bold' || node.style.fontWeight === '700') rPr += '<w:b/><w:bCs/>';
+            if (node.style.fontWeight === 'bold' || node.style.fontWeight === '700') rPr += '<w:b/>';
             if (node.style.fontStyle === 'italic') rPr += '<w:i/>';
             if (node.style.textDecorationLine === 'underline' || node.style.textDecoration === 'underline') rPr += '<w:u w:val="single"/>';
             if (node.style.fontFamily) {
                 const f = node.style.fontFamily.replace(/["']/g, '');
-                rPr += `<w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:eastAsia="${f}"/>`;
+                rPr += `<w:rFonts w:ascii="${f}" w:eastAsia="${f}"/>`;
             }
             if (node.style.fontSize) {
-                rPr += `<w:sz w:val="${ptToHalfPoint(node.style.fontSize)}"/><w:szCs w:val="${ptToHalfPoint(node.style.fontSize)}"/>`;
+                rPr += `<w:sz w:val="${ptToHalfPoint(node.style.fontSize)}"/>`;
             }
             // 文字颜色
             if (node.style.color) {
@@ -667,7 +646,7 @@
             if (child.nodeType === Node.TEXT_NODE) {
                 const t = child.textContent;
                 if (t.trim()) {
-                    result += `<w:r><w:rPr>${rPr}</w:rPr><w:t xml:space="preserve">${escXml(t)}</w:t></w:r>`;
+                    result += `<w:r><w:rPr>${rPr}</w:rPr><w:t>${escXml(t)}</w:t></w:r>`;
                 }
             } else if (child.nodeType === Node.ELEMENT_NODE) {
                 const ct = child.tagName.toLowerCase();
@@ -681,7 +660,7 @@
         if (!result) {
             const t = node.textContent || '';
             if (t.trim()) {
-                result = `<w:r><w:rPr>${rPr}</w:rPr><w:t xml:space="preserve">${escXml(t)}</w:t></w:r>`;
+                result = `<w:r><w:rPr>${rPr}</w:rPr><w:t>${escXml(t)}</w:t></w:r>`;
             }
         }
         return result;
@@ -755,19 +734,18 @@
 
     function rPr(family, halfPt, bold) {
         let p = '';
-        p += `<w:rFonts w:ascii="${family}" w:hAnsi="${family}" w:eastAsia="${family}" w:cs="${family}"/>`;
-        p += `<w:sz w:val="${halfPt}"/><w:szCs w:val="${halfPt}"/>`;
-        if (bold) p += '<w:b/><w:bCs/>';
-        p += '<w:color w:val="000000"/>';
+        p += `<w:rFonts w:ascii="${family}" w:eastAsia="${family}"/>`;
+        p += `<w:sz w:val="${halfPt}"/>`;
+        if (bold) p += '<w:b/>';
         return p;
     }
 
-    // 标题用 run 属性：加粗 + 大字 + 指定字体 + 颜色（纯格式，无样式）
+    // 标题用 run 属性：加粗 + 大字 + 指定字体 + 颜色
     function headingRPr(family, halfPt, bold, colorHex) {
         let p = '';
-        p += `<w:rFonts w:ascii="${family}" w:hAnsi="${family}" w:eastAsia="${family}" w:cs="${family}"/>`;
-        p += `<w:sz w:val="${halfPt}"/><w:szCs w:val="${halfPt}"/>`;
-        if (bold) p += '<w:b/><w:bCs/>';
+        p += `<w:rFonts w:ascii="${family}" w:eastAsia="${family}"/>`;
+        p += `<w:sz w:val="${halfPt}"/>`;
+        if (bold) p += '<w:b/>';
         p += `<w:color w:val="${colorHex || '000000'}"/>`;
         return p;
     }
@@ -775,8 +753,8 @@
     // 代码等宽字体 run 属性
     function codeRPr(family, halfPt) {
         let p = '';
-        p += `<w:rFonts w:ascii="${family}" w:hAnsi="${family}" w:eastAsia="${family}" w:cs="${family}"/>`;
-        p += `<w:sz w:val="${halfPt}"/><w:szCs w:val="${halfPt}"/>`;
+        p += `<w:rFonts w:ascii="${family}" w:eastAsia="${family}"/>`;
+        p += `<w:sz w:val="${halfPt}"/>`;
         p += '<w:color w:val="333333"/>';
         return p;
     }
@@ -791,15 +769,9 @@
 <w:styles xmlns:w="${NS.w}" xmlns:mc="${NS.mc}" xmlns:r="${NS.r}">
     <w:style w:type="paragraph" w:default="1" w:styleId="Normal">
         <w:name w:val="Normal"/>
-        <w:qFormat/>
-        <w:pPr>
-            <w:spacing w:before="60" w:after="60" w:line="${Math.round(parseFloat(bf.lineHeight || '1.5') * 240)}" w:lineRule="auto"/>
-        </w:pPr>
         <w:rPr>
-            <w:rFonts w:ascii="${bodyFont}" w:hAnsi="${bodyFont}" w:eastAsia="${bodyFont}" w:cs="${bodyFont}"/>
+            <w:rFonts w:ascii="${bodyFont}" w:eastAsia="${bodyFont}"/>
             <w:sz w:val="${bodySize}"/>
-            <w:szCs w:val="${bodySize}"/>
-            <w:color w:val="000000"/>
         </w:rPr>
     </w:style>
     <w:style w:type="paragraph" w:styleId="ListParagraph">

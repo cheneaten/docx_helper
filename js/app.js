@@ -4778,6 +4778,8 @@
             var fromStorage = loadConfigFromStorage();
             if (!fromStorage) { readHeadingConfig(); applyHeadingStylesToEditor(); }
         }
+        // 设置默认段落分隔符为 <p>（Chromium 默认用 <div>，会导致导出 DOCX 正文丢失）
+        try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch(e) {}
         // 初始化标签管理器（从 IndexedDB 恢复或创建默认文档）
         return tabManager.init().then(function() {
             var active = tabManager.getActive();
@@ -6549,6 +6551,7 @@
         var dragState = null;       // { mode:'move'|'resize', shapeId, offX, offY, handle, startX, startY, startW, startH }
         var connectState = null;    // { fromId, tempX, tempY }
         var textEditShapeId = null;
+        var copiedShape = null;     // Ctrl+C 复制的形状数据
         // 撤销栈：每个条目 { pixels: ImageData, shapes: clone, connectors: clone }
         var undoStack = [];
         var maxUndo = 30;
@@ -7535,14 +7538,18 @@
         // 键盘删除
         document.addEventListener('keydown', function delKeyHandler(e) {
             if (!drawPanelOpen) return;
-            if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedId || selectedConnId)) {
-                e.preventDefault();
-                deleteSelected();
-            }
-            // 回车完成文字编辑
+            // 回车完成文字编辑（在 early return 之前，优先级最高）
             if (e.key === 'Enter' && textEditShapeId && !e.shiftKey) {
                 e.preventDefault();
                 finishTextEdit();
+                return;
+            }
+            // 正在编辑文字时不拦截任何按键，让 contenteditable 正常处理
+            if (textEditShapeId || (drawTextInput && drawTextInput.contains(e.target))) return;
+            // Delete/Backspace 删除选中的形状或连线
+            if ((e.key === 'Delete' || e.key === 'Backspace') && (selectedId || selectedConnId)) {
+                e.preventDefault();
+                deleteSelected();
             }
         });
 
@@ -7582,6 +7589,8 @@
         // ===== 键盘快捷键 =====
         document.addEventListener('keydown', function drawKeyHandler(e) {
             if (!drawPanelOpen) return;
+            // 文字编辑中跳过所有快捷键，避免干扰 contenteditable 输入
+            if (textEditShapeId || (drawTextInput && drawTextInput.contains(e.target))) return;
             var toolMap = {
                 's':'select', 'p':'pencil', 'l':'line', 'a':'arrow', 'e':'eraser',
                 'r':'roundrect', 'd':'diamond', 'h':'hexagon',
@@ -7595,6 +7604,34 @@
                 return;
             }
             if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); undo(); }
+            // Ctrl+C 复制选中的形状
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C') && !textEditShapeId) {
+                if (selectedId) {
+                    var src = findShape(selectedId);
+                    if (src) {
+                        copiedShape = JSON.parse(JSON.stringify(src));
+                        setDrawStatus('已复制 ' + getShapeLabel(src.type));
+                    }
+                }
+            }
+            // Ctrl+V 粘贴复制的形状
+            if ((e.ctrlKey || e.metaKey) && (e.key === 'v' || e.key === 'V') && !textEditShapeId) {
+                if (copiedShape) {
+                    var clone = JSON.parse(JSON.stringify(copiedShape));
+                    clone.id = 'shape_' + (++shapeIdCounter);
+                    clone.x += 20;
+                    clone.y += 20;
+                    // 保持在画布边界内
+                    if (clone.x + clone.w > CANVAS_W) clone.x = Math.max(0, CANVAS_W - clone.w);
+                    if (clone.y + clone.h > CANVAS_H) clone.y = Math.max(0, CANVAS_H - clone.h);
+                    shapes.push(clone);
+                    selectedId = clone.id;
+                    selectedConnId = null;
+                    saveState();
+                    renderShapes();
+                    setDrawStatus('已粘贴 ' + getShapeLabel(clone.type));
+                }
+            }
         });
 
         // ===== 观察面板显示 =====
