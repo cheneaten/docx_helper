@@ -1022,7 +1022,9 @@
         var hs = editor.querySelectorAll('h1, h2, h3, h4, h5, h6');
         for (var i = 0; i < hs.length; i++) {
             var t = hs[i].textContent.trim();
-            if (/^[\d]+[\.．、]/.test(t) || /^[IVXLCDM]+[\.．、]/.test(t) || /^[A-Z][\.．、]/.test(t) || /^[一二三四五六七八九十百]+[、]/.test(t) || /^（[一二三四五六七八九十百]+）/.test(t)) {
+            // 严格层级编号检测：
+            // H1: 一、 / H2:（一） / H3: 1. / H4:（1） / H5: ① / H6: a.
+            if (/^[\d]+[\.．、]/.test(t) || /^[IVXLCDM]+[\.．、]/.test(t) || /^[a-z][\.．、]/.test(t) || /^[一二三四五六七八九十百千]+[、]/.test(t) || /^（[一二三四五六七八九十百千]+）/.test(t) || /^（\d+）/.test(t) || /^[①-⑳]/.test(t)) {
                 hasExistingNumbering = true; return true;
             }
         }
@@ -1036,7 +1038,9 @@
             var ft = null;
             while (w.nextNode()) { if (w.currentNode.textContent.trim()) { ft = w.currentNode; break; } }
             if (!ft) return;
-            var m = ft.textContent.match(/^(\s*[\d]+[\.．、](?:[\d]+[\.．、])*\s*|\s*[\d]+[\.．、]\s*|\s*[IVXLCDM]+[\.．、]\s*|\s*[A-Z][\.．、]\s*|\s*[一二三四五六七八九十百]+[、]\s*|\s*（[一二三四五六七八九十百]+）\s*)/);
+            // 严格层级编号前缀匹配：
+            // H1: 一、 / H2:（一） / H3: 1. / H4:（1） / H5: ① / H6: a.
+            var m = ft.textContent.match(/^(\s*[\d]+[\.．、](?:[\d]+[\.．、])*\s*|\s*[\d]+[\.．、]\s*|\s*[a-z][\.．、]\s*|\s*[IVXLCDM]+[\.．、]\s*|\s*[A-Z][\.．、]\s*|\s*[一二三四五六七八九十百千]+[、]\s*|\s*（[一二三四五六七八九十百千]+）\s*|\s*（\d+）\s*|\s*[①-⑳]\s*)/);
             if (m) ft.textContent = ft.textContent.substring(m[0].length);
         });
         hasExistingNumbering = false;
@@ -1145,8 +1149,19 @@
 
 
     function getChineseNumberText(prefix, level) {
+        // 严格层级编号体系：
+        // H1: 一、二、三…
+        // H2: （一）（二）（三）…
+        // H3: 1. 2. 3. …
+        // H4: （1）（2）（3）…
+        // H5: ① ② ③ …
+        // H6: a. b. c. …
         if (level === 1) return toChineseNum(prefix[0]) + '、';
         if (level === 2) return '（' + toChineseNum(prefix[1]) + '）';
+        if (level === 3) return prefix[2] + '. ';
+        if (level === 4) return '（' + prefix[3] + '）';
+        if (level === 5) return toCircledNum(prefix[4]) + ' ';
+        if (level === 6) return toAlphaNum(prefix[5]) + '. ';
         return prefix[level - 1] + '.';
     }
 
@@ -1159,6 +1174,25 @@
         if (n >= 10) { s += cn[Math.floor(n / 10)] + '十'; n = n % 10; }
         if (n > 0) s += cn[n];
         return s;
+    }
+
+    // 阿拉伯数字 → 带圈数字 ①-⑳（超出范围返回原数字加圈标记）
+    function toCircledNum(n) {
+        // Unicode 带圈数字：① U+2460 ~ ⑳ U+2473
+        if (n >= 1 && n <= 20) {
+            return String.fromCharCode(0x245F + n);
+        }
+        // 超出 20 返回备用形式
+        return '(' + n + ')';
+    }
+
+    // 数字 → 小写字母 a-z（超出范围用双字母 aa, ab, ...）
+    function toAlphaNum(n) {
+        if (n <= 26) return String.fromCharCode(96 + n);
+        // 超出 26 个字母时使用双字母组合
+        var hi = Math.floor((n - 1) / 26);
+        var lo = ((n - 1) % 26) + 1;
+        return toAlphaNum(hi) + String.fromCharCode(96 + lo);
     }
 
     var CONFIG_FILENAME = 'docx-editor-config.json';
@@ -1783,30 +1817,57 @@
                 }
             });
 
-            // Bold heuristic detection (改进：优先按中文编号模式判断级别)
+            // Bold heuristic detection（严格按中文编号前缀识别标题级别，无编号不识别）
             tempDiv.querySelectorAll('p').forEach(function(p) {
                 if (/^H[1-6]$/i.test(p.tagName) || (p.closest && p.closest('table')) || p.textContent.trim().length < 2) return;
                 if (p.childNodes.length === 1 && p.childNodes[0].nodeType === Node.ELEMENT_NODE && (p.childNodes[0].tagName === 'STRONG' || p.childNodes[0].tagName === 'B')) {
                     var text = p.textContent.trim();
                     var lv = null;
 
-                    // 中文编号模式检测
-                    if (/^[一二三四五六七八九十百千]+[、]/.test(text)) lv = 1;           // 一、 → H1
-                    else if (/^[（\(][一二三四五六七八九十百千]+[）\)]/.test(text)) lv = 2; // （一）→ H2
-                    else if (/^\d+[\.、]/.test(text)) lv = 3;                            // 1. → H3
-                    else if (/^[（\(]\d+[）\)]/.test(text)) lv = 4;                       // （1）→ H4
+                    // 严格层级编号模式检测（必须带编号前缀才识别为标题）
+                    // H1: 一、二、三…（中文数字 + 、）
+                    if (/^[一二三四五六七八九十百千]+[、]/.test(text)) lv = 1;
+                    // H2: （一）（二）（三）…（中文数字加括号）
+                    else if (/^[（\(][一二三四五六七八九十百千]+[）\)]/.test(text)) lv = 2;
+                    // H3: 1. 2. 3. …（阿拉伯数字 + .）
+                    else if (/^\d+[\.、]/.test(text)) lv = 3;
+                    // H4: （1）（2）（3）…（阿拉伯数字加括号）
+                    else if (/^[（\(]\d+[）\)]/.test(text)) lv = 4;
+                    // H5: ① ② ③ …（带圈数字）
+                    else if (/^[①-⑳]/.test(text)) lv = 5;
+                    // H6: a. b. c. …（小写字母 + .）
+                    else if (/^[a-z][\.、]/.test(text)) lv = 6;
 
-                    // 无编号，按长度推算（中文阈值适当降低）
-                    if (lv === null) {
-                        var len = text.length;
-                        lv = len <= 6 ? 1 : len <= 15 ? 2 : len <= 25 ? 3 : len <= 40 ? 4 : 5;
-                    }
+                    // 无编号前缀则不识别为标题（避免将格式相同但没编号的段落误判为标题）
+                    if (lv === null) return;
 
                     var h = document.createElement('H' + lv);
                     h.innerHTML = p.innerHTML;
                     if (p.id) h.id = p.id;
                     p.parentNode.replaceChild(h, p);
                 }
+            });
+
+            // H5/H6 补充检测：H5 和 H6 默认配置为非粗体（bold: false），
+            // 粗体启发式检测无法捕获它们，因此对所有段落做第二轮扫描，
+            // 仅检测 H5 带圈数字（①）和 H6 小写字母（a.）两种高特征前缀
+            tempDiv.querySelectorAll('p').forEach(function(p) {
+                if (/^H[1-6]$/i.test(p.tagName) || (p.closest && p.closest('table'))) return;
+                var text = p.textContent.trim();
+                if (text.length < 2) return;
+                var lv = null;
+
+                // H5: ① ② ③ …（带圈数字 — 特征非常明显，不会误判）
+                if (/^[①-⑳]/.test(text)) lv = 5;
+                // H6: a. b. c. …（小写字母 + .，且段落较短不会过长）
+                else if (/^[a-z][\.、]\s/.test(text) && text.length <= 80) lv = 6;
+
+                if (lv === null) return;
+
+                var h = document.createElement('H' + lv);
+                h.innerHTML = p.innerHTML;
+                if (p.id) h.id = p.id;
+                p.parentNode.replaceChild(h, p);
             });
 
             // ===== 从原始 DOCX 提取内联格式（颜色、字号、字体、下划线、背景色） =====
@@ -1927,9 +1988,9 @@
 
             generateTOC();
             updateStats();
-            if (!detectExistingNumbering()) {
-                renumber();
-            }
+            // 始终重新编号以应用当前编号格式（stripTextPrefixes 会清除旧格式）
+            detectExistingNumbering();
+            renumber();
             // 清理旧锚点和折叠数据（新文档不含）
             anchors = [];
             foldPoints = [];

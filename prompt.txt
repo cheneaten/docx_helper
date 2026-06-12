@@ -8,7 +8,7 @@
 2. 通读 DOCX 文档全文，理解整体内容和逻辑层次
 3. 从一级标题开始梳理，为每个标题确定：
    - level（1/2/3…）
-   - text（含编号的完整标题，如"一、引言"）
+   - text（含编号的完整标题，如"一、引言""（一）背景""1. 现状""（1）来源""① 样本""a. 说明"）
    - anchor（该标题所辖第一段的前 4-6 个连续汉字）
    - position（统一用 "before"）
 4. 输出严格合法的 JSON 数组
@@ -37,7 +37,7 @@
 
 ### 输出示例
 
-[{"level":1,"text":"一、项目背景","anchor":"随着互联网的快速发展","position":"before"},{"level":2,"text":"（一）研究现状","anchor":"目前国内外学者","position":"before"}]
+[{"level":1,"text":"一、项目背景","anchor":"随着互联网的快速发展","position":"before"},{"level":2,"text":"（一）研究现状","anchor":"目前国内外学者","position":"before"},{"level":3,"text":"1. 技术路线","anchor":"本系统采用微服务","position":"before"},{"level":4,"text":"（1）数据层","anchor":"数据库选用MySQL","position":"before"},{"level":5,"text":"① 读写分离","anchor":"主库负责写入操作","position":"before"},{"level":6,"text":"a. 主库配置","anchor":"主库采用双节点","position":"before"}]
 
 ### DOCX 文档内容
 
